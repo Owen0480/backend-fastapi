@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse, HTMLResponse
 from app.core.config import settings
 from app.api.v1.router import api_router
 
@@ -9,6 +10,28 @@ app = FastAPI(
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+
 @app.get("/")
 def root():
-    return {"message": "Welcome to FastAPI Project"}
+    """루트 접속 시 데모 페이지 링크를 보여줍니다."""
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html><head><meta charset="UTF-8"><title>Backend FastAPI</title></head>
+    <body style="font-family:Malgun Gothic;margin:24px;">
+    <h1>Welcome to FastAPI Project</h1>
+    <p><a href="/demo" style="font-size:1.2em;">▶ 여행 데모 페이지 열기</a></p>
+    <p>또는 <a href="/api/v1/demo/travel-demo">/api/v1/demo/travel-demo</a></p>
+    <p><a href="/docs">API 문서 (Swagger)</a></p>
+    </body></html>
+    """)
+
+
+@app.get("/demo")
+def demo_redirect():
+    """/demo 접속 시 데모 페이지로 리다이렉트 (URL 단순화)."""
+    return RedirectResponse(url=f"{settings.API_V1_STR}/demo/travel-demo", status_code=302)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app="main:app", host="0.0.0.0", port=8000, reload=True)  # reload=True : 코드 변경 시 서버 자동 재시작
