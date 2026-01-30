@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse, HTMLResponse
 from app.core.config import settings
 from app.api.v1.router import api_router
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -30,6 +34,28 @@ def root():
 def demo_redirect():
     """/demo 접속 시 데모 페이지로 리다이렉트 (URL 단순화)."""
     return RedirectResponse(url=f"{settings.API_V1_STR}/demo/travel-demo", status_code=302)
+
+#============================================================================
+
+base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+images_path = os.path.join(base_path, "images")
+
+from fastapi.staticfiles import StaticFiles
+app.mount("/static/images", StaticFiles(directory=images_path), name="images")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+def root():
+    return {"message": "Welcome to FastAPI Project"}
+
+#============================================================================
 
 
 if __name__ == "__main__":
