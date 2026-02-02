@@ -50,6 +50,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/home")
+def get_home():
+    # 파일 위치 찾기
+    html_path = os.path.join(base_path, "..", "travel-frontend", "public", "imageSeaching.html")
+    if not os.path.exists(html_path):
+        return {"error": f"HTML 파일을 찾을 수 없습니다: {html_path}"}
+    return FileResponse(html_path)
 
 @app.get("/")
 def root():
