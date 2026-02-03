@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import os
@@ -13,7 +12,6 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
-# API 라우터
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
@@ -39,20 +37,12 @@ def demo_redirect():
 
 
 # =============================================================================
-# 정적 파일 및 CORS
+# 정적 파일
 
-# main.py가 backend-fastapi 루트에 있으므로, 여기 기준으로 경로 계산
 base_path = os.path.dirname(os.path.abspath(__file__))
 images_path = os.path.join(base_path, "images")
 
 app.mount("/images", StaticFiles(directory=images_path), name="images")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.get("/home")
