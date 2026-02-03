@@ -19,7 +19,7 @@ pip install langchain-google-genai
 ## 2. 서버 실행
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn main:app --reload
 ```
 
 - 기본 주소: **http://127.0.0.1:8000**
@@ -127,7 +127,7 @@ GOOGLE_API_KEY=여기에_Gemini_API_키_입력
 
 ## 7. reload 시 "Exception ignored in: BaseEventLoop.__del__" / CancelledError
 
-`uvicorn app.main:app --reload` 로 실행 중 **파일을 저장하면** WatchFiles가 변경을 감지하고 이전 프로세스를 종료합니다. 이때 **이전 프로세스**의 asyncio 이벤트 루프를 정리하는 과정에서 다음 로그가 나올 수 있습니다.
+`uvicorn main:app --reload` 로 실행 중 **파일을 저장하면** WatchFiles가 변경을 감지하고 이전 프로세스를 종료합니다. 이때 **이전 프로세스**의 asyncio 이벤트 루프를 정리하는 과정에서 다음 로그가 나올 수 있습니다.
 
 - `Exception ignored in: <function BaseEventLoop.__del__ at ...>`
 - `asyncio.exceptions.CancelledError`
@@ -137,7 +137,7 @@ GOOGLE_API_KEY=여기에_Gemini_API_키_입력
 **대응**:
 - 새로 고침 후 `INFO: Application startup complete.` 가 다시 찍히면 그대로 사용해도 됩니다.
 - 이 로그가 거슬리면 **reload 없이** 실행해 보세요:  
-  `uvicorn app.main:app --host 0.0.0.0 --port 8000`  
+  `uvicorn main:app --host 0.0.0.0 --port 8000`  
   코드 수정 후에는 서버를 수동으로 한 번씩 끄고 다시 실행하면 됩니다.
 - 그래프는 **첫 요청 시에만** 생성되도록 바꿔 두어서, reload 시 teardown 시점에 연결된 객체가 줄어들었습니다.
 
@@ -148,7 +148,7 @@ GOOGLE_API_KEY=여기에_Gemini_API_키_입력
 서버를 **Ctrl+C**로 중지하면 uvicorn이 `KeyboardInterrupt` 를 받으면서 위와 비슷한 Traceback을 출력할 수 있습니다.
 
 - **의미**: 서버를 사용자가 중지했다는 신호(KeyboardInterrupt)를 uvicorn이 받고, 그 과정에서 나오는 로그입니다.
-- **대응**: 무시해도 됩니다. 서버가 종료된 것이 정상입니다. 다시 켜려면 `uvicorn app.main:app --reload` 를 다시 실행하면 됩니다.
+- **대응**: 무시해도 됩니다. 서버가 종료된 것이 정상입니다. 다시 켜려면 `uvicorn main:app --reload` 를 다시 실행하면 됩니다.
 
 ---
 
@@ -159,7 +159,7 @@ GOOGLE_API_KEY=여기에_Gemini_API_키_입력
    - `http://localhost:8000/demo` 도 동일하게 사용 가능  
 
 2. **서버 실행 여부**  
-   - 터미널에서 `uvicorn app.main:app --reload` 가 실행 중인지 확인  
+   - 터미널에서 `uvicorn main:app --reload` 가 실행 중인지 확인  
    - 브라우저에서 `http://127.0.0.1:8000/` 이 열리면 서버는 정상  
 
 3. **패키지 오류로 서버가 안 뜨는 경우**  
