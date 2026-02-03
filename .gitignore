@@ -24,4 +24,3 @@ wheels/
 # Virtual Environment
 venv/
 .env
-*.db
