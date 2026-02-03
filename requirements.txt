@@ -5,6 +5,10 @@ pydantic-settings
 python-multipart
 email-validator
 requests
+httpx
+python-dotenv
 langgraph
+langchain
 langchain-core
 langchain-openai
+langchain-google-genai
