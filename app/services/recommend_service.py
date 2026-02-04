@@ -92,7 +92,8 @@ class RecommendService:
             return {"success": False, "message": "비교할 DB 이미지가 없습니다."}
 
         cos_scores = util.cos_sim(user_img_emb, self.db_features)[0]
-        top_results = np.argpartition(-cos_scores, range(3))[:3] # 상위 3개
+        k = min(3, len(self.db_features))
+        top_results = np.argpartition(-cos_scores, range(k))[:k]  # 상위 k개
 
         results = []
         for idx in top_results:
@@ -102,25 +103,71 @@ class RecommendService:
             if score > 0.6:  # 임계값
                 place_info = self._get_place_info(file_name)
                 if place_info['success']:
-                    guide = self._generate_travel_guide(place_info['place_name'], place_info['address'])
                     results.append({
                         "place_name": place_info['place_name'],
                         "address": place_info['address'],
                         "score": score,
                         "image_file": file_name,
-                        "guide": guide
+                        # guide는 Top-1만 Gemini로 생성하고, 나머지는 CSV 기반 짧은 문구로 채움
+                        "guide": "",
+                        # CSV 기반 짧은 설명을 위한 부가 정보
+                        "poi_name": place_info.get("poi_name", ""),
+                        "visit_area_type_cd": place_info.get("visit_area_type_cd", ""),
+                        "residence_time_min": place_info.get("residence_time_min", ""),
+                        "dgstfn": place_info.get("dgstfn", ""),
                     })
 
         if results:
             # 점수 높은 순으로 정렬
             results.sort(key=lambda x: x['score'], reverse=True)
+            # Top-1만 Gemini 호출 (429/한도 문제 최소화)
+            top1 = results[0]
+            top1_guide = self._generate_travel_guide(top1.get("place_name", ""), top1.get("address", ""))
+            if not top1_guide:
+                top1_guide = self._generate_short_guide(
+                    place_name=top1.get("place_name", ""),
+                    address=top1.get("address", ""),
+                    score=top1.get("score", 0),
+                    poi_name=top1.get("poi_name", ""),
+                    visit_area_type_cd=top1.get("visit_area_type_cd", ""),
+                    residence_time_min=top1.get("residence_time_min", ""),
+                    dgstfn=top1.get("dgstfn", ""),
+                )
+            results[0]["guide"] = top1_guide
+
+            # Top-2/3는 CSV 기반 짧은 설명으로 채움
+            for i in range(1, len(results)):
+                r = results[i]
+                r["guide"] = self._generate_short_guide(
+                    place_name=r.get("place_name", ""),
+                    address=r.get("address", ""),
+                    score=r.get("score", 0),
+                    poi_name=r.get("poi_name", ""),
+                    visit_area_type_cd=r.get("visit_area_type_cd", ""),
+                    residence_time_min=r.get("residence_time_min", ""),
+                    dgstfn=r.get("dgstfn", ""),
+                )
+
+            # 응답에는 프론트가 쓰는 필드만 남김 (부가 필드는 제거)
+            for r in results:
+                r.pop("poi_name", None)
+                r.pop("visit_area_type_cd", None)
+                r.pop("residence_time_min", None)
+                r.pop("dgstfn", None)
             return {"success": True, "count": len(results), "results": results}
         else:
-            # 유사 장소 없을 시 Gemini 분석 결과 반환
+            # 유사 장소 없을 시 Gemini로 설명 시도 (429/한도 초과 시 500 방지)
             if self.gemini_model:
-                analysis = self.gemini_model.generate_content(["이 사진이 어떤 사진인지 한국어로 한 문장 설명해줘.", user_img])
-                return {"success": False, "ai_analysis": analysis.text}
-            return {"success": False, "ai_analysis": "Gemini API가 설정되지 않았습니다."}
+                try:
+                    analysis = self.gemini_model.generate_content(["이 사진이 어떤 사진인지 한국어로 한 문장 설명해줘.", user_img])
+                    ai_text = (analysis.text if analysis and hasattr(analysis, "text") else "") or ""
+                    return {"success": False, "ai_analysis": ai_text or "유사한 여행지를 찾지 못했습니다."}
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    if "429" in err_msg or "quota" in err_msg or "rate" in err_msg:
+                        return {"success": False, "ai_analysis": "유사한 여행지를 찾지 못했습니다. (AI 설명 한도 초과 — 잠시 후 다시 시도해 주세요.)"}
+                    return {"success": False, "ai_analysis": "유사한 여행지를 찾지 못했습니다. 다른 사진을 올려 보세요."}
+            return {"success": False, "ai_analysis": "유사한 여행지를 찾지 못했습니다. 다른 사진을 올려 보세요."}
 
     def _safe_str(self, val, default=""):
         """NaN/None을 제거하고 항상 str로 반환 (Pydantic 검증 통과용)"""
@@ -143,8 +190,51 @@ class RecommendService:
             )
             # 도로명 우선, 없으면 지번 주소
             addr = self._safe_str(row.get('ROAD_NM_ADDR')) or self._safe_str(row.get('LOTNO_ADDR'), '주소 정보 없음')
-            return {"place_name": p_name, "address": addr, "success": True}
+            poi_name = self._safe_str(row.get("POI_NM")) or self._safe_str(row.get("POI_NM_y")) or self._safe_str(row.get("POI_NM_x"))
+            visit_area_type_cd = self._safe_str(row.get("VISIT_AREA_TYPE_CD"))
+            residence_time_min = self._safe_str(row.get("RESIDENCE_TIME_MIN"))
+            dgstfn = self._safe_str(row.get("DGSTFN"))
+            return {
+                "place_name": p_name,
+                "address": addr,
+                "poi_name": poi_name,
+                "visit_area_type_cd": visit_area_type_cd,
+                "residence_time_min": residence_time_min,
+                "dgstfn": dgstfn,
+                "success": True,
+            }
         return {"success": False}
+
+    def _generate_short_guide(
+        self,
+        place_name: str,
+        address: str,
+        score: float,
+        poi_name: str = "",
+        visit_area_type_cd: str = "",
+        residence_time_min: str = "",
+        dgstfn: str = "",
+    ) -> str:
+        """LLM 없이 CSV 기반으로 짧은 안내 문구 생성"""
+        parts = []
+        if poi_name:
+            parts.append(f"POI: {poi_name}")
+        if visit_area_type_cd:
+            parts.append(f"유형코드: {visit_area_type_cd}")
+        if residence_time_min:
+            parts.append(f"권장 체류: {residence_time_min}분")
+        if dgstfn:
+            parts.append(f"만족도: {dgstfn}")
+        meta = " · ".join(parts)
+        pct = int(round((score or 0) * 100))
+        base = f"{pct}% 유사한 분위기의 후보 여행지입니다."
+        if meta:
+            base += f" ({meta})"
+        if address:
+            base += f" 주소: {address}"
+        if place_name:
+            return f"{place_name} — {base}"
+        return base
 
     def _generate_travel_guide(self, place_name, address):
         """Gemini 여행 가이드 생성"""
