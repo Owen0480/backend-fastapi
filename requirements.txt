@@ -5,6 +5,12 @@ pydantic-settings
 python-multipart
 email-validator
 requests
+numpy
+pandas
+Pillow
+sentence-transformers
+google-generativeai
+chromadb
 langgraph
 langchain-core
 langchain-openai
