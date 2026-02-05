@@ -47,7 +47,7 @@ def extract_json(text: str):
 
 # ============== 노드 함수들 ==============
 
-def intent_classifier_node(state: AgentState) -> AgentState:
+async def intent_classifier_node(state: AgentState) -> AgentState:
     """사용자의 입력을 분류하는 노드"""
     print("\n=== 의도 분류 중 ===")
     
@@ -69,7 +69,7 @@ def intent_classifier_node(state: AgentState) -> AgentState:
 
     응답은 오직 한 단어(recommend_travel, general_chat, irrelevant_chat)로만 하세요."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_input)
     ])
@@ -89,7 +89,7 @@ def intent_classifier_node(state: AgentState) -> AgentState:
     return AgentState(intent=intent, current_step="intent_classifier")
 
 
-def general_chat_node(state: AgentState) -> AgentState:
+async def general_chat_node(state: AgentState) -> AgentState:
     """간단한 인사나 일상 대화에 응답하는 노드"""
     print("\n=== 일상 대화 응답 중 ===")
     
@@ -105,7 +105,7 @@ def general_chat_node(state: AgentState) -> AgentState:
     그리고 자연스럽게 국내 여행지 추천이 필요하면 언제든 말씀해달라고 덧붙이세요.
     이모지를 적절히 사용하여 따뜻한 분위기를 만드세요."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_input)
     ])
@@ -116,7 +116,7 @@ def general_chat_node(state: AgentState) -> AgentState:
     )
 
 
-def irrelevant_chat_node(state: AgentState) -> AgentState:
+async def irrelevant_chat_node(state: AgentState) -> AgentState:
     """주제에서 벗어난 질문에 대해 가이드를 주는 노드"""
     print("\n=== 부적합 대화 안내 중 ===")
     
@@ -125,7 +125,7 @@ def irrelevant_chat_node(state: AgentState) -> AgentState:
     정중하게 당신의 역할을 설명하고 여행에 관한 질문만 해달라고 안내하세요.
     단호하지만 친절한 말투를 유지하세요."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content="여행과 상관없는 질문을 하거나 부적절한 대화를 시도함.")
     ])
@@ -136,7 +136,7 @@ def irrelevant_chat_node(state: AgentState) -> AgentState:
     )
 
 
-def collect_preferences_node(state: AgentState) -> AgentState:
+async def collect_preferences_node(state: AgentState) -> AgentState:
     """사용자 선호도 수집 노드"""
     print("\n=== 입력 수집 중 ===")
     
@@ -175,7 +175,7 @@ def collect_preferences_node(state: AgentState) -> AgentState:
             
         # 기존에 알고 있는 정보도 함께 전달하여 문맥 유지
         try:
-            response = llm.invoke([
+            response = await llm.ainvoke([
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=f"기존 추출 정보: {json.dumps(current_prefs, ensure_ascii=False)}\n사용자 입력: {user_input}\n\n새로운 정보를 반영하여 JSON으로 출력하고, 여전히 부족한 정보는 'missing_fields'에 나열하세요. 다른 설명 없이 오직 JSON만 반환하세요.")
             ])
@@ -226,7 +226,7 @@ def collect_preferences_node(state: AgentState) -> AgentState:
     return AgentState(current_step="collect_preferences")
 
 
-def generate_candidates_node(state: AgentState) -> AgentState:
+async def generate_candidates_node(state: AgentState) -> AgentState:
     """여행지 후보 생성 노드"""
     print("\n=== 후보지 생성 중 ===")
     
@@ -252,7 +252,7 @@ def generate_candidates_node(state: AgentState) -> AgentState:
 
     응답은 반드시 JSON 배열 형태([ ... ])로만 하세요. 다른 설명이나 텍스트는 절대 포함하지 마세요."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content="여행지를 추천해주세요.")
     ])
@@ -277,7 +277,7 @@ def generate_candidates_node(state: AgentState) -> AgentState:
         )
 
 
-def validate_candidates_node(state: AgentState) -> AgentState:
+async def validate_candidates_node(state: AgentState) -> AgentState:
     """후보지 품질 검증 노드"""
     print("\n=== 후보 검증 중 ===")
     
@@ -313,7 +313,7 @@ def validate_candidates_node(state: AgentState) -> AgentState:
         "issues": ["문제점 리스트"]
     }}"""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content="후보를 평가해주세요.")
     ])
@@ -349,7 +349,7 @@ def validate_candidates_node(state: AgentState) -> AgentState:
             current_step="validate_candidates"
         )
 
-def enrich_information_node(state: AgentState) -> AgentState:
+async def enrich_information_node(state: AgentState) -> AgentState:
     """여행지 정보 보강 노드"""
     print("\n=== 정보 수집 중 ===")
     
@@ -366,7 +366,7 @@ def enrich_information_node(state: AgentState) -> AgentState:
     각 destination에 대해 enriched_info 필드를 추가한 JSON 배열로 응답하세요.
     원본 정보는 유지하고 enriched_info만 추가하세요."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=f"다음 여행지들의 정보를 보강하세요:\n{json.dumps(candidates, ensure_ascii=False, indent=2)}")
     ])
@@ -389,7 +389,7 @@ def enrich_information_node(state: AgentState) -> AgentState:
         )
 
 
-def validate_information_node(state: AgentState) -> AgentState:
+async def validate_information_node(state: AgentState) -> AgentState:
     """수집된 정보의 품질 검증 노드"""
     print("\n=== 정보 품질 검증 중 ===")
     
@@ -411,7 +411,7 @@ def validate_information_node(state: AgentState) -> AgentState:
     # 전체가 너무 크면 샘플만 검증
     sample = enriched[:3] if len(enriched) > 3 else enriched
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=f"정보를 평가하세요:\n{json.dumps(sample, ensure_ascii=False, indent=2)}")
     ])
@@ -443,7 +443,7 @@ def validate_information_node(state: AgentState) -> AgentState:
             current_step="validate_information"
         )
 
-def filter_options_node(state: AgentState) -> AgentState:
+async def filter_options_node(state: AgentState) -> AgentState:
     """Hard constraint로 필터링하는 노드"""
     print("\n=== 옵션 필터링 중 ===")
     
@@ -463,7 +463,7 @@ def filter_options_node(state: AgentState) -> AgentState:
     
     적합한 여행지만 JSON 배열로 반환하세요. 다른 텍스트 없이 배열만."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=f"다음 중 적합한 여행지만 선택하세요:\n{json.dumps(enriched, ensure_ascii=False, indent=2)}")
     ])
@@ -493,7 +493,7 @@ def filter_options_node(state: AgentState) -> AgentState:
             current_step="filter_options"
         )
 
-def rank_destinations_node(state: AgentState) -> AgentState:
+async def rank_destinations_node(state: AgentState) -> AgentState:
     """여행지 순위 매기기 노드"""
     print("\n=== 여행지 순위화 중 ===")
     
@@ -511,7 +511,7 @@ def rank_destinations_node(state: AgentState) -> AgentState:
     
     상위 3개를 ranking 순서대로 JSON 배열로 반환하세요."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=f"다음 여행지를 순위화하세요:\n{json.dumps(filtered, ensure_ascii=False, indent=2)}")
     ])
@@ -535,7 +535,7 @@ def rank_destinations_node(state: AgentState) -> AgentState:
         )
 
 
-def final_check_node(state: AgentState) -> AgentState:
+async def final_check_node(state: AgentState) -> AgentState:
     """최종 검증 노드"""
     print("\n=== 최종 검증 중 ===")
     
@@ -558,7 +558,7 @@ def final_check_node(state: AgentState) -> AgentState:
     
     JSON으로 응답: {{"approved": true/false, "comments": "평가"}}"""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content="최종 검증해주세요.")
     ])
@@ -590,7 +590,7 @@ def final_check_node(state: AgentState) -> AgentState:
             current_step="final_check"
         )
 
-def present_recommendations_node(state: AgentState) -> AgentState:
+async def present_recommendations_node(state: AgentState) -> AgentState:
     """최종 추천 제시 노드"""
     print("\n=== 추천 결과 제시 ===")
     
@@ -609,7 +609,7 @@ def present_recommendations_node(state: AgentState) -> AgentState:
     친근하고 설득력 있게, 이모지를 적절히 사용해서 작성하세요.
     각 여행지를 명확히 구분하고, 읽기 쉽게 포맷팅하세요."""
     
-    response = llm.invoke([
+    response = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=f"""
         사용자 선호도: {json.dumps(prefs, ensure_ascii=False)}
