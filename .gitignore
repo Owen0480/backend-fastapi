@@ -26,3 +26,7 @@ venv/
 .venv/
 .env
 *.db
+chroma_db/475bb924-b918-4e31-a08e-3c5653d08622/data_level0.bin
+chroma_db/475bb924-b918-4e31-a08e-3c5653d08622/header.bin
+chroma_db/475bb924-b918-4e31-a08e-3c5653d08622/length.bin
+chroma_db/475bb924-b918-4e31-a08e-3c5653d08622/link_lists.bin
