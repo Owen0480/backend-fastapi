@@ -7,12 +7,10 @@ async def run_travel_chat(user_input: str, thread_id: str):
     """
     config = {"configurable": {"thread_id": thread_id}}
 
-    from langchain_core.messages import HumanMessage
-    
     # 초기 상태 구성: 새로운 유저 메시지만 전달
     # MemorySaver가 thread_id를 기반으로 기존 'user_preferences' 등을 유지함
     input_data = {
-        "messages": [HumanMessage(content=user_input)]
+        "messages": [{"role": "user", "content": user_input}]
     }
 
     # 그래프 실행 (비동기)
