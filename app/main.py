@@ -41,7 +41,7 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 images_path = os.path.join(base_path, "images")
 
 from fastapi.staticfiles import StaticFiles
-app.mount("/static/images", StaticFiles(directory=images_path), name="images")
+app.mount("/images", StaticFiles(directory=images_path), name="images")
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,15 +52,11 @@ app.add_middleware(
 
 @app.get("/home")
 def get_home():
-    # 파일 위치 찾기
+    """프론트 이미지 검색 페이지 (정적 HTML)."""
     html_path = os.path.join(base_path, "..", "travel-frontend", "public", "imageSeaching.html")
     if not os.path.exists(html_path):
         return {"error": f"HTML 파일을 찾을 수 없습니다: {html_path}"}
     return FileResponse(html_path)
-
-@app.get("/")
-def root():
-    return {"message": "Welcome to FastAPI Project"}
 
 #============================================================================
 
