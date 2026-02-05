@@ -26,3 +26,4 @@ venv/
 .venv/
 .env
 *.db
+chroma_db/

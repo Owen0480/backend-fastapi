@@ -5,12 +5,20 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
-from app.core.config import settings
 from app.graph2.state import AgentState
+
+load_dotenv()
+
+# LLM 초기화 (.env에서 직접 가져옴)
+# llm = ChatGoogleGenerativeAI(
+#     model="gemini-2.5-flash",
+#     google_api_key=os.getenv("GOOGLE_API_KEY"),
+#     temperature=0.7
+# )
 
 llm = ChatGroq(
     model_name="llama-3.1-8b-instant", 
-    groq_api_key=settings.GROQ_API_KEY,
+    groq_api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.4
 )
 
