@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     # LLM Settings
     OPENAI_API_KEY: str = "AIzaSyAjkr1eefz0UhXpy7ZkPxw8RXh8-a6DqHo"
     GOOGLE_API_KEY: Optional[str] = None
-    GROQ_API_KEY: Optional[str] = None
     
     # 타임아웃 (초). LLM·그래프 호출이 이 시간을 넘기면 중단하고 에러 표출
     LLM_TIMEOUT_SEC: int = 25
