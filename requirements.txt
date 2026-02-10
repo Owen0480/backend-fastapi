@@ -13,11 +13,9 @@ pandas
 Pillow
 sentence-transformers
 chromadb
-langgraph
 langchain
 langchain-core
 langchain-openai
 langchain-google-genai
-langchain-groq
 langchain-community
 torch
