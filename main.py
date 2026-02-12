@@ -86,6 +86,12 @@ def get_home():
     return FileResponse(html_path)
 
 
+@app.get("/image-search")
+def get_image_search():
+    """이미지 검색 페이지 (정적 HTML). /home 과 동일."""
+    return get_home()
+
+
 if __name__ == "__main__":
     import uvicorn
 

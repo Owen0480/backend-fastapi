@@ -111,13 +111,23 @@ class RecommendService:
             return pd.DataFrame()
         try:
             with self._db_conn.cursor() as cur:
-                cur.execute("""
-                    SELECT pp.photo_file_nm AS PHOTO_FILE_NM, pp.visit_area_id AS VISIT_AREA_ID,
-                           COALESCE(pp.visit_area_nm, p.visit_area_nm) AS VISIT_AREA_NM,
-                           p.road_nm_addr AS ROAD_NM_ADDR, p.lotno_addr AS LOTNO_ADDR
-                    FROM place_photo pp
-                    LEFT JOIN place p ON p.visit_area_id = pp.visit_area_id
-                """)
+                try:
+                    cur.execute("""
+                        SELECT pp.photo_file_nm AS PHOTO_FILE_NM, pp.visit_area_id AS VISIT_AREA_ID,
+                               COALESCE(pp.visit_area_nm, p.visit_area_nm) AS VISIT_AREA_NM,
+                               p.road_nm_addr AS ROAD_NM_ADDR, p.lotno_addr AS LOTNO_ADDR,
+                               pp.image_url AS image_url
+                        FROM place_photo pp
+                        LEFT JOIN place p ON p.visit_area_id = pp.visit_area_id
+                    """)
+                except Exception:
+                    cur.execute("""
+                        SELECT pp.photo_file_nm AS PHOTO_FILE_NM, pp.visit_area_id AS VISIT_AREA_ID,
+                               COALESCE(pp.visit_area_nm, p.visit_area_nm) AS VISIT_AREA_NM,
+                               p.road_nm_addr AS ROAD_NM_ADDR, p.lotno_addr AS LOTNO_ADDR
+                        FROM place_photo pp
+                        LEFT JOIN place p ON p.visit_area_id = pp.visit_area_id
+                    """)
                 rows = cur.fetchall()
             if not rows:
                 return pd.DataFrame()
@@ -133,8 +143,8 @@ class RecommendService:
         """임베딩 캐시 저장 경로"""
         return os.path.join(self._base_dir, "embedding_cache")
 
-    def _load_embedding_cache(self, expected_count):
-        """캐시가 있고 place_photo 건수가 맞으면 (features, filenames) 반환, 아니면 (None, None)"""
+    def _load_embedding_cache(self, expected_count, source="db"):
+        """캐시가 있고 건수가 맞으면 (features, filenames) 반환. source: 'db' | 'images_folder'"""
         cache_dir = self._embedding_cache_dir()
         meta_path = os.path.join(cache_dir, "meta.json")
         features_path = os.path.join(cache_dir, "features.npy")
@@ -144,15 +154,19 @@ class RecommendService:
         try:
             with open(meta_path, "r", encoding="utf-8") as f:
                 meta = json.load(f)
-            if meta.get("place_photo_count") != expected_count:
-                return None, None
+            if source == "db":
+                if meta.get("place_photo_count") != expected_count:
+                    return None, None
+            else:
+                if meta.get("source") != "images_folder" or meta.get("file_count") != expected_count:
+                    return None, None
             features = np.load(features_path)
             with open(filenames_path, "r", encoding="utf-8") as f:
                 filenames = json.load(f)
             if len(filenames) != features.shape[0]:
                 return None, None
-            # 구버전 캐시(파일명만)면 이미지-장소 매칭 오류 가능 → 재계산 유도
-            if filenames and not any(isinstance(x, str) and "|" in x for x in filenames[: min(10, len(filenames))]):
+            # DB 모드에서만: 구버전 캐시(파일명만)면 이미지-장소 매칭 오류 가능 → 재계산 유도
+            if source == "db" and filenames and not any(isinstance(x, str) and "|" in x for x in filenames[: min(10, len(filenames))]):
                 print("임베딩 캐시가 구버전(파일명만)이라 이미지-장소 매칭을 위해 재계산합니다.")
                 return None, None
             return features, filenames
@@ -160,8 +174,8 @@ class RecommendService:
             print(f"임베딩 캐시 로드 실패: {e}")
             return None, None
 
-    def _save_embedding_cache(self, count):
-        """현재 db_features, db_filenames를 캐시에 저장"""
+    def _save_embedding_cache(self, count, source="db"):
+        """현재 db_features, db_filenames를 캐시에 저장. source: 'db' | 'images_folder'"""
         if len(self.db_filenames) == 0:
             return
         cache_dir = self._embedding_cache_dir()
@@ -170,9 +184,10 @@ class RecommendService:
             np.save(os.path.join(cache_dir, "features.npy"), self.db_features)
             with open(os.path.join(cache_dir, "filenames.json"), "w", encoding="utf-8") as f:
                 json.dump(self.db_filenames, f, ensure_ascii=False)
+            meta = {"place_photo_count": count} if source == "db" else {"source": "images_folder", "file_count": count}
             with open(os.path.join(cache_dir, "meta.json"), "w", encoding="utf-8") as f:
-                json.dump({"place_photo_count": count}, f)
-            print(f"임베딩 캐시 저장 완료: {cache_dir} ({len(self.db_filenames)}개)")
+                json.dump(meta, f)
+            print(f"임베딩 캐시 저장 완료: {cache_dir} ({len(self.db_filenames)}개) — 다음부터 캐시 로드로 빠르게 시작")
         except Exception as e:
             print(f"임베딩 캐시 저장 실패: {e}")
 
@@ -274,6 +289,15 @@ class RecommendService:
         files = [f for f in os.listdir(self.db_images_folder)
                  if f.endswith(('.jpg', '.png', '.jpeg'))]
         total_files = len(files)
+        if total_files == 0:
+            return
+        # images 폴더 모드에서도 캐시 사용: 있으면 로드 후 생략
+        features, filenames = self._load_embedding_cache(total_files, source="images_folder")
+        if features is not None and filenames is not None:
+            self.db_features = features
+            self.db_filenames = filenames
+            print(f"임베딩 캐시 로드: {len(self.db_filenames)}개 (images 폴더 기준) — 분석 생략")
+            return
         print(f"DB 이미지 분석 중... (총 {total_files}개, 이 작업은 처음에 한 번만 실행됩니다)")
         report_every = max(50, total_files // 15)
         for i, f in enumerate(files):
@@ -291,6 +315,7 @@ class RecommendService:
         if self.db_features:
             self.db_features = np.array(self.db_features)
             print(f"총 {len(self.db_filenames)}개의 이미지 분석 완료.")
+            self._save_embedding_cache(total_files, source="images_folder")
 
     def _ensure_place_docs_index(self):
         """Chroma에 장소 문서가 없으면 CSV 기반으로 생성/저장."""
@@ -415,7 +440,7 @@ class RecommendService:
             if not place_info.get('success'):
                 continue
             place_name = (place_info.get('place_name') or "").strip()
-            raw_results.append({
+            r = {
                 "place_name": place_name,
                 "address": place_info.get('address', ''),
                 "score": score,
@@ -426,7 +451,10 @@ class RecommendService:
                 "residence_time_min": place_info.get("residence_time_min", ""),
                 "dgstfn": place_info.get("dgstfn", ""),
                 "visit_area_id": place_info.get("visit_area_id", ""),
-            })
+            }
+            if place_info.get("image_url"):
+                r["image_url"] = place_info.get("image_url")
+            raw_results.append(r)
 
         # 같은 이미지 파일에 여러 장소가 붙은 경우: 이미지와 어울리는 장소명(해수욕장·해변 등) 우선, 하나만 노출
         def _image_place_fit_score(name):
@@ -564,7 +592,7 @@ class RecommendService:
             visit_area_type_cd = self._safe_str(row.get("VISIT_AREA_TYPE_CD"))
             residence_time_min = self._safe_str(row.get("RESIDENCE_TIME_MIN"))
             dgstfn = self._safe_str(row.get("DGSTFN"))
-            return {
+            out = {
                 "visit_area_id": self._safe_str(row.get("VISIT_AREA_ID")),
                 "place_name": p_name,
                 "address": addr,
@@ -574,6 +602,9 @@ class RecommendService:
                 "dgstfn": dgstfn,
                 "success": True,
             }
+            if "image_url" in row and row.get("image_url"):
+                out["image_url"] = self._safe_str(row.get("image_url"), "")
+            return out
         return {"success": False}
 
     def _generate_short_guide(
@@ -634,6 +665,7 @@ class RecommendService:
 [작성 요청]
 - 취향이 있으면 그 관점(가족/맛집/힐링 등)에 맞춰 자연스럽게 써줘.
 - 형식: 1) 한 줄 요약 2) 이 장소만의 특징 한 줄 3) 여행 팁(근거에 있을 때만). 없으면 3) 생략.
+- 2) 특징에는 주소·위치·도로명을 쓰지 말고, 이 장소의 분위기·매력·특색만 간략히 써줘. (주소는 [근거]에 이미 있음)
 - 말투: 친구에게 추천하듯 부드럽고 자연스럽게. 딱딱한 설명체 말고 구어체에 가깝게.
 - 5문장 이내, 한국어.
 """

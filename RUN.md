@@ -152,7 +152,80 @@ GOOGLE_API_KEY=여기에_Gemini_API_키_입력
 
 ---
 
-## 9. 데모 페이지가 안 열릴 때
+## 9. 국내 여행로그 4개 폴더 → DB에 넣고 이미지 추천 쓰기
+
+이미지 추천을 **backend-fastapi/images** 대신 **국내 여행로그 데이터(수도권/동부권/서부권/제주도 및 도서지역)** 4개 폴더 기준으로 쓰려면, 아래 순서대로 하면 됩니다.
+
+### 폴더 구조 (travel_pj 기준)
+
+```
+D:\travel_pj\
+  국내 여행로그 데이터(수도권)\Sample\01.원천데이터\photo\  ...  02.라벨링데이터\csv\*.csv
+  국내 여행로그 데이터(동부권)\...
+  국내 여행로그 데이터(서부권)\...
+  국내 여행로그 데이터(제주도 및 도서지역)\...
+  backend-fastapi\
+```
+
+### 1) MariaDB 테이블 생성
+
+- Docker MariaDB 3306에서 `travel` DB 사용 중이어야 함.
+- HeidiSQL / DBeaver / MySQL Workbench 등에서 **travel** DB 선택 후 아래 SQL 실행:
+
+```sql
+-- docs/sql/create-place-tables.sql 내용 실행
+```
+
+또는 터미널에서:
+
+```powershell
+cd D:\travel_pj\backend-fastapi
+Get-Content docs\sql\create-place-tables.sql | mysql -h 127.0.0.1 -P 3306 -u root -p1104 travel
+```
+
+### 2) .env 설정 (DB 비밀번호)
+
+`backend-fastapi\.env` 에 다음 추가 (Docker MariaDB 비밀번호가 1104인 경우):
+
+```env
+MARIADB_HOST=127.0.0.1
+MARIADB_PASSWORD=1104
+```
+
+(선택) 4개 폴더가 있는 루트가 `D:\travel_pj` 가 아니면:
+
+```env
+TRAVEL_DATA_ROOT=D:\경로\to\국내여행로그_상위폴더
+```
+
+### 3) 국내 여행로그 → place / place_photo INSERT
+
+```powershell
+cd D:\travel_pj\backend-fastapi
+.\venv\Scripts\Activate.ps1
+python scripts/insert_place_data.py
+```
+
+- **처음 한 번만** DB를 비우고 넣으려면:  
+  `$env:CLEAR_BEFORE_INSERT="1"; python scripts/insert_place_data.py`
+- **실제 이미지 파일이 있는 행만** 넣으려면:  
+  `$env:ONLY_EXISTING_IMAGES="1"; python scripts/insert_place_data.py`
+- 데이터가 너무 크면 샘플만 (예: 10%):  
+  `$env:INSERT_SAMPLE_RATIO="0.1"; python scripts/insert_place_data.py`
+
+### 4) 서버 재시작
+
+```powershell
+uvicorn main:app --reload
+```
+
+- 터미널에 **"이미지 추천 DB(3306) 로드: place_photo N건"** 이 나오면 DB 사용 중.
+- **"DB 이미지 분석 중... (3306 place_photo 기준, 이미지 루트: ...)"** 후 4개 폴더 이미지로 임베딩 계산 (첫 실행 시 몇 분 걸릴 수 있음).
+- 이미지 URL은 `/images/파일명` 으로 서빙되며, `main.py` 의 `_resolve_image_path` 가 **backend-fastapi/images** 없으면 **국내 여행로그 4개 폴더 photo** 에서 찾습니다.
+
+---
+
+## 10. 데모 페이지가 안 열릴 때
 
 1. **주소 확인**  
    - `http://127.0.0.1:8000/demo` 또는 `http://127.0.0.1:8000/api/v1/demo/travel-demo`  

@@ -381,10 +381,10 @@ def main():
                 insert_place(conn)
                 insert_place_photo(conn)
             else:
-                # 지역별로 동일 비율 샘플 (수도권 10%, 동부권 10%, 서부권 10%, 제주도 10%)
-                photo_sampled = photo_df.groupby("_region", group_keys=False).apply(
+                # 지역별로 동일 비율 샘플 (수도권/동부권/서부권/제주도 균등)
+                photo_sampled = photo_df.groupby("_region", group_keys=True).apply(
                     lambda g: g.sample(frac=INSERT_SAMPLE_RATIO, random_state=42)
-                ).reset_index(drop=True)
+                ).reset_index(level=0)  # _region 컬럼 유지
                 # 지역별 ID 접두어(A,B,C,D)로 동일 ID 충돌 방지 (월정리해수욕장 vs 수원 등 주소 섞임 방지)
                 photo_sampled = photo_sampled.copy()
                 photo_sampled["visit_area_id_prefixed"] = photo_sampled["_region"].map(REGION_TO_SUFFIX) + "_" + photo_sampled["VISIT_AREA_ID"].astype(str)

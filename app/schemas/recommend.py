@@ -7,11 +7,12 @@ from typing import Optional, List
 
 
 class RecommendResultItem(BaseModel):
-    """results 배열 한 항목"""
+    """results 배열 한 항목. 이미지는 image_url(전체 URL) 사용."""
     place_name: str
     address: str
     score: float
-    image_file: str
+    image_file: str  # 파일명 (하위 호환)
+    image_url: str  # 이미지 전체 URL (프론트는 이걸 사용)
     guide: str
 
 
